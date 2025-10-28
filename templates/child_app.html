@@ -1,0 +1,463 @@
+{% extends "base.html" %}
+
+{% block title %}Child App - Background Tracking{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  body {
+    background: var(--bg-color);
+    margin: 0;
+    padding: 10px;
+  }
+  
+  .child-app-container {
+    max-width: 900px;
+    margin: 10px auto;
+    padding: 15px;
+  }
+  
+  .status-card {
+    background: var(--bg-color);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    box-shadow: 9px 9px 16px var(--shadow-dark),
+                -9px -9px 16px var(--shadow-light);
+    margin-bottom: 0;
+    text-align: center;
+  }
+  
+  .status-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 20px;
+  }
+  
+  .status-indicator-large {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 9px 9px 16px var(--shadow-dark),
+                -9px -9px 16px var(--shadow-light);
+    animation: pulse 2s infinite;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .status-text {
+    text-align: left;
+    flex: 1;
+  }
+  
+  .status-text h2 {
+    margin: 0;
+    font-size: 1.2em;
+  }
+  
+  .status-text p {
+    margin: 5px 0 0;
+    font-size: 0.85em;
+    color: var(--primary-color);
+  }
+  
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+  }
+  
+  .material-icons-round {
+    font-size: 32px;
+    color: white;
+  }
+  
+  .tracking-info {
+    margin-top: 15px;
+    font-size: 0.85em;
+    color: var(--primary-color);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  
+  .tracking-info p {
+    margin: 5px 0;
+  }
+  
+  #childMap {
+    height: 50vh;
+    min-height: 300px;
+    width: 100%;
+    border-radius: 12px;
+    margin: 15px 0 0;
+    position: relative;
+  }
+  
+  .map-wrapper {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: inset 4px 4px 8px var(--shadow-dark),
+                inset -4px -4px 8px var(--shadow-light);
+    padding: 3px;
+  }
+  
+  .leaflet-container {
+    border-radius: 10px;
+  }
+  
+  /* Mobile First Responsive */
+  @media (min-width: 768px) {
+    body {
+      padding: 20px;
+    }
+    
+    .child-app-container {
+      padding: 20px;
+    }
+    
+    .status-card {
+      padding: 30px;
+    }
+    
+    .status-text h2 {
+      font-size: 1.5em;
+    }
+    
+    #childMap {
+      height: 600px;
+      margin: 20px 0 0;
+    }
+    
+    .tracking-info {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  
+  @media (min-width: 1200px) {
+    .child-app-container {
+      max-width: 1000px;
+    }
+  }
+</style>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="child-app-container">
+    <div class="status-card">
+        <div class="status-header">
+            <div class="status-indicator-large online">
+                <span class="material-icons-round">
+                    location_on
+                </span>
+            </div>
+            <div class="status-text">
+                <h2>Child Location Tracker</h2>
+                <p id="status">Tracking your location...</p>
+            </div>
+        </div>
+        
+        <div class="map-wrapper">
+            <div id="childMap"></div>
+        </div>
+        
+        <div class="tracking-info">
+            <p><strong>Last update:</strong><br><span id="lastUpdate">--:--</span></p>
+            <p><strong>Location:</strong><br><span id="coordinates" style="font-size: 0.85em;">Getting location...</span></p>
+        </div>
+        
+        <!-- Demo Button -->
+        <div style="margin-top: 20px; text-align: center;">
+            <button class="neu-button neu-button-danger" onclick="triggerDemoMove()" style="padding: 15px 30px; font-size: 1em;">
+                <span class="material-icons-round" style="vertical-align: middle; margin-right: 8px;">warning</span>
+                Demo: Move Outside Geofence
+            </button>
+            <p style="margin-top: 10px; font-size: 0.85em; color: var(--primary-color);">
+                Simulate leaving the safe zone to test alert system
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/location.js') }}"></script>
+<script>
+// Initialize map
+let childMap = null;
+let currentMarker = null;
+let geofenceCircles = [];
+
+// Load and display geofences on map
+async function loadGeofences() {
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/dashboard/api/geofences', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        
+        if (data.status === 'ok' && data.geofences) {
+            data.geofences.forEach(geofence => {
+                drawGeofence(geofence);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading geofences:', error);
+    }
+}
+
+function drawGeofence(geofence) {
+    // Create circle for geofence
+    const circle = L.circle(
+        [geofence.center_latitude, geofence.center_longitude],
+        {
+            radius: geofence.radius_meters,
+            color: '#d63031',  // Red border
+            fillColor: '#ffffff',  // White fill
+            fillOpacity: 0.3,
+            weight: 3
+        }
+    ).addTo(childMap);
+    
+    // Add label
+    const label = L.marker([geofence.center_latitude, geofence.center_longitude], {
+        icon: L.divIcon({
+            className: 'geofence-label',
+            html: `<div style="background: rgba(255,255,255,0.9); padding: 5px 10px; border-radius: 5px; font-weight: 600; color: #d63031; border: 2px solid #d63031;">${geofence.name}</div>`,
+            iconSize: [null, 30],
+            iconAnchor: [0, 15]
+        })
+    }).addTo(childMap);
+    
+    geofenceCircles.push(circle);
+    
+    return circle;
+}
+
+function checkGeofenceStatus(lat, lng) {
+    // Check if location is inside any geofence
+    let isInside = false;
+    let statusText = 'Outside all safe zones';
+    
+    geofenceCircles.forEach((circle, index) => {
+        const center = circle.getLatLng();
+        const radius = circle.options.radius;
+        
+        // Calculate distance
+        const distance = L.latLng(lat, lng).distanceTo(center);
+        
+        if (distance <= radius) {
+            isInside = true;
+            statusText = 'Inside safe zone';
+            // Change to green
+            circle.setStyle({
+                fillColor: '#00b894',
+                color: '#00b894',
+                fillOpacity: 0.3,
+                weight: 3
+            });
+        } else {
+            // Keep red when outside
+            circle.setStyle({
+                fillColor: '#ffffff',
+                color: '#d63031',
+                fillOpacity: 0.3,
+                weight: 3
+            });
+        }
+    });
+    
+    // Update status indicator
+    const indicator = document.querySelector('.status-indicator-large');
+    if (indicator) {
+        indicator.className = `status-indicator-large ${isInside ? 'online' : 'offline'}`;
+    }
+    
+    // Update status text
+    document.getElementById('status').textContent = statusText;
+}
+
+function initChildMap(lat, lng) {
+    if (!childMap) {
+        // Create map
+        childMap = L.map('childMap').setView([lat, lng], 15);
+        
+        // Add tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(childMap);
+        
+        // Add marker
+        currentMarker = L.marker([lat, lng], {
+            icon: L.icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
+            })
+        }).addTo(childMap);
+        currentMarker.bindPopup('<b>Your Current Location</b>').openPopup();
+        
+        // Load geofences
+        loadGeofences();
+    } else {
+        // Update map view
+        childMap.setView([lat, lng], 15);
+        
+        // Update marker
+        if (currentMarker) {
+            currentMarker.setLatLng([lat, lng]);
+            currentMarker.bindPopup('<b>Your Current Location</b>').openPopup();
+        }
+    }
+    
+    // Update coordinates display
+    document.getElementById('coordinates').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    
+    // Check geofence status
+    checkGeofenceStatus(lat, lng);
+}
+
+// Override the sendLocation function from location.js to also update map
+async function originalSendLocation(latitude, longitude, accuracy) {
+    try {
+        const API_BASE = '/api';
+        const token = localStorage.getItem('token');
+        
+        const response = await fetch(`${API_BASE}/location`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                latitude,
+                longitude,
+                accuracy,
+                platform: 'web',
+                device_token: 'web-browser'
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'ok' && data.alert_triggered) {
+            console.log('Alert triggered!');
+            // alert('🚨 Alert: You are outside the safe zone!');
+        }
+    } catch (error) {
+        console.error('Error sending location:', error);
+    }
+}
+
+window.sendLocation = async function(latitude, longitude, accuracy) {
+    // Update map
+    initChildMap(latitude, longitude);
+    
+    // Call original function
+    await originalSendLocation(latitude, longitude, accuracy);
+};
+
+// Try to get initial location for map
+if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition((position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        initChildMap(lat, lng);
+    });
+}
+
+// Demo function to simulate moving outside geofence with smooth animation
+async function triggerDemoMove() {
+    try {
+        console.log('Demo: Triggering move outside geofence...');
+        
+        // Get current geofences
+        const token = localStorage.getItem('token');
+        const response = await fetch('/dashboard/api/geofences', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        
+        if (data.status === 'ok' && data.geofences && data.geofences.length > 0) {
+            const geofence = data.geofences[0];
+            const centerLat = geofence.center_latitude;
+            const centerLng = geofence.center_longitude;
+            const radius = geofence.radius_meters;
+            
+            // Get current location
+            const currentLat = childMap.getCenter().lat;
+            const currentLng = childMap.getCenter().lng;
+            
+            // Calculate destination point well outside the radius (1km beyond the radius)
+            const offsetKm = (radius / 1000) + 1; // 1km outside
+            const offsetLat = offsetKm / 111;
+            
+            // Move south of the geofence center
+            const targetLat = centerLat - offsetLat;
+            const targetLng = centerLng;
+            
+            console.log(`Demo: Animating from ${currentLat}, ${currentLng} to ${targetLat}, ${targetLng}`);
+            
+            // Animate marker movement with 10 steps for smooth transition
+            const steps = 10;
+            const latStep = (targetLat - currentLat) / steps;
+            const lngStep = (targetLng - currentLng) / steps;
+            
+            // Update status to show movement
+            document.getElementById('status').textContent = 'Moving outside safe zone...';
+            
+            // Animate the marker
+            for (let i = 1; i <= steps; i++) {
+                const newLat = currentLat + (latStep * i);
+                const newLng = currentLng + (lngStep * i);
+                
+                // Update map smoothly
+                if (currentMarker) {
+                    currentMarker.setLatLng([newLat, newLng], {
+                        animate: true,
+                        duration: 0.8
+                    });
+                    // Center map on marker
+                    childMap.setView([newLat, newLng], 15);
+                }
+                
+                // Update coordinates display
+                document.getElementById('coordinates').textContent = `${newLat.toFixed(6)}, ${newLng.toFixed(6)}`;
+                
+                // Wait a bit between steps for smooth animation (slower)
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            // Send location multiple times to meet alert threshold (needs 2+ consecutive "outside" updates)
+            for (let i = 0; i < 3; i++) {
+                await originalSendLocation(targetLat, targetLng, 10);
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            // Update status
+            document.getElementById('status').textContent = 'Outside safe zone - Alert triggered!';
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+            
+            // Check geofence status after movement
+            checkGeofenceStatus(targetLat, targetLng);
+            
+        } else {
+            console.warn('No geofence found. Please create a geofence first.');
+            document.getElementById('status').textContent = 'No geofence found - Please create one first';
+        }
+    } catch (error) {
+        console.error('Error in demo:', error);
+        document.getElementById('status').textContent = 'Error: ' + error.message;
+    }
+}
+</script>
+{% endblock %}
+

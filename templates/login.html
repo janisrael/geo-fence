@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Geofence Tracking{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="header neu-container">
+        <h1>Geofence Tracking System</h1>
+        <p>Safe zone monitoring for your loved ones</p>
+    </div>
+
+    <div class="neu-container" style="max-width: 400px; margin: 50px auto;">
+        <h2 style="text-align: center; margin-bottom: 30px;">Login</h2>
+        
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="phone">Phone Number</label>
+                <input type="tel" id="phone" name="phone" class="neu-input" 
+                       placeholder="+1234567890" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" class="neu-input" 
+                       placeholder="Enter your password" required>
+            </div>
+            
+            <button type="submit" class="neu-button neu-button-primary" style="width: 100%;">
+                <span class="material-icons-round" style="vertical-align: middle; margin-right: 8px;">login</span>
+                Login
+            </button>
+        </form>
+        
+        <p style="text-align: center; margin-top: 20px;">
+            Don't have an account? 
+            <a href="#" onclick="showRegister()" style="color: var(--primary-color); font-weight: 600;">Register</a>
+        </p>
+        
+        <div id="errorMessage" class="hidden" style="margin-top: 20px; padding: 15px; border-radius: 12px; background: rgba(214, 48, 49, 0.1); color: var(--danger-color);">
+        </div>
+    </div>
+
+    <!-- Register Modal -->
+    <div id="registerModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2>Create Account</h2>
+            <form id="registerForm">
+                <div class="form-group">
+                    <label for="regName">Name</label>
+                    <input type="text" id="regName" name="name" class="neu-input" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="regPhone">Phone Number</label>
+                    <input type="tel" id="regPhone" name="phone" class="neu-input" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="regEmail">Email (Optional)</label>
+                    <input type="email" id="regEmail" name="email" class="neu-input">
+                </div>
+                
+                <div class="form-group">
+                    <label for="regPassword">Password</label>
+                    <input type="password" id="regPassword" name="password" class="neu-input" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="regRole">I am a:</label>
+                    <select id="regRole" name="role" class="neu-input" required>
+                        <option value="parent">Parent</option>
+                        <option value="child">Child</option>
+                    </select>
+                </div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" class="neu-button" onclick="closeRegister()" style="flex: 1;">
+                        Cancel
+                    </button>
+                    <button type="submit" class="neu-button neu-button-primary" style="flex: 1;">
+                        Register
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+const API_BASE = '/api';
+
+async function login(event) {
+    event.preventDefault();
+    
+    const phone = document.getElementById('phone').value;
+    const password = document.getElementById('password').value;
+    
+    try {
+        const response = await fetch(`${API_BASE}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone, password })
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'ok') {
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('user', JSON.stringify(data.user));
+            window.location.href = '/dashboard/';
+        } else {
+            showError(data.message);
+        }
+    } catch (error) {
+        showError('Login failed. Please try again.');
+    }
+}
+
+async function register(event) {
+    event.preventDefault();
+    
+    const formData = {
+        name: document.getElementById('regName').value,
+        phone: document.getElementById('regPhone').value,
+        email: document.getElementById('regEmail').value,
+        password: document.getElementById('regPassword').value,
+        role: document.getElementById('regRole').value
+    };
+    
+    try {
+        const response = await fetch(`${API_BASE}/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'ok') {
+            alert('Registration successful! Please login.');
+            closeRegister();
+            document.getElementById('regName').value = '';
+            document.getElementById('regPhone').value = '';
+            document.getElementById('regEmail').value = '';
+            document.getElementById('regPassword').value = '';
+        } else {
+            alert(data.message);
+        }
+    } catch (error) {
+        alert('Registration failed. Please try again.');
+    }
+}
+
+function showError(message) {
+    const errorDiv = document.getElementById('errorMessage');
+    errorDiv.textContent = message;
+    errorDiv.classList.remove('hidden');
+    setTimeout(() => errorDiv.classList.add('hidden'), 5000);
+}
+
+function showRegister() {
+    document.getElementById('registerModal').classList.add('active');
+}
+
+function closeRegister() {
+    document.getElementById('registerModal').classList.remove('active');
+}
+
+document.getElementById('loginForm').addEventListener('submit', login);
+document.getElementById('registerForm').addEventListener('submit', register);
+</script>
+{% endblock %}
+
+
+

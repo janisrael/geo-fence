@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block title %}Child App - Background Tracking{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  body {
+    background: var(--bg-color);
+  }
+  
+  .child-app-container {
+    max-width: 1200px;
+    margin: 20px auto;
+    padding: 20px;
+  }
+  
+  .status-card {
+    background: var(--bg-color);
+    border-radius: var(--border-radius);
+    padding: 30px;
+    box-shadow: 9px 9px 16px var(--shadow-dark),
+                -9px -9px 16px var(--shadow-light);
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  
+  .map-section {
+    background: var(--bg-color);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    box-shadow: 9px 9px 16px var(--shadow-dark),
+                -9px -9px 16px var(--shadow-light);
+  }
+  
+  #childMap {
+    height: 500px;
+    width: 100%;
+    border-radius: 12px;
+    margin: 10px 0;
+  }
+  
+  .status-indicator-large {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    margin: 30px auto;
+    box-shadow: 9px 9px 16px var(--shadow-dark),
+                -9px -9px 16px var(--shadow-light);
+    animation: pulse 2s infinite;
+  }
+  
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+  }
+  
+  .material-icons-round {
+    font-size: 48px;
+    margin: 0 auto;
+  }
+  
+  .tracking-info {
+    margin-top: 20px;
+    font-size: 0.9em;
+    color: var(--primary-color);
+  }
+  
+  .leaflet-container {
+    border-radius: 12px;
+    box-shadow: 7px 7px 14px var(--shadow-dark),
+                -7px -7px 14px var(--shadow-light);
+  }
+</style>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="child-app-container">
+    <div class="status-card">
+        <h2>Location Tracking Active</h2>
+        
+        <div class="status-indicator-large online">
+            <span class="material-icons-round" style="display: block; margin-top: 16px; color: white;">
+                location_on
+            </span>
+        </div>
+        
+        <p style="margin: 20px 0; font-size: 1.2em;">Tracking your location...</p>
+        
+        <div class="tracking-info">
+            <p>App is running in background</p>
+            <p>Last update: <span id="lastUpdate">--:--</span></p>
+            <p>Status: <span id="status">Active</span></p>
+            <p>Location: <span id="coordinates">Getting location...</span></p>
+        </div>
+    </div>
+    
+    <div class="map-section">
+        <h3>Your Current Location</h3>
+        <div id="childMap"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/location.js') }}"></script>
+<script>
+// Initialize map
+let childMap = null;
+let currentMarker = null;
+let geofenceCircles = [];
+
+// Load and display geofences on map
+async function loadGeofences() {
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/dashboard/api/geofences', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        
+        if (data.status === 'ok' && data.geofences) {
+            data.geofences.forEach(geofence => {
+                drawGeofence(geofence);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading geofences:', error);
+    }
+}
+
+function drawGeofence(geofence) {
+    // Create circle for geofence
+    const circle = L.circle(
+        [geofence.center_latitude, geofence.center_longitude],
+        {
+            radius: geofence.radius_meters,
+            color: '#d63031',  // Red border
+            fillColor: '#ffffff',  // White fill
+            fillOpacity: 0.2,
+            weight: 2
+        }
+    ).addTo(childMap);
+    
+    // Add label
+    const label = L.marker([geofence.center_latitude, geofence.center_longitude], {
+        icon: L.divIcon({
+            className: 'geofence-label',
+            html: `<div style="background: rgba(255,255,255,0.9); padding: 5px 10px; border-radius: 5px; font-weight: 600; color: #d63031; border: 2px solid #d63031;">${geofence.name}</div>`,
+            iconSize: [null, 30],
+            iconAnchor: [0, 15]
+        })
+    }).addTo(childMap);
+    
+    geofenceCircles.push(circle);
+    
+    return circle;
+}
+
+function checkGeofenceStatus(lat, lng) {
+    // Check if location is inside any geofence
+    let isInside = false;
+    let statusText = 'Outside all safe zones';
+    
+    geofenceCircles.forEach((circle, index) => {
+        const center = circle.getLatLng();
+        const radius = circle.options.radius;
+        
+        // Calculate distance
+        const distance = L.latLng(lat, lng).distanceTo(center);
+        
+        if (distance <= radius) {
+            isInside = true;
+            statusText = 'Inside safe zone';
+            // Change to green
+            circle.setStyle({
+                fillColor: '#00b894',
+                color: '#00b894'
+            });
+        } else {
+            // Keep red when outside
+            circle.setStyle({
+                fillColor: '#ffffff',
+                color: '#d63031'
+            });
+        }
+    });
+    
+    // Update status indicator
+    const indicator = document.querySelector('.status-indicator-large');
+    if (indicator) {
+        indicator.className = `status-indicator-large ${isInside ? 'online' : 'offline'}`;
+    }
+    
+    // Update status text
+    document.getElementById('status').textContent = statusText;
+}
+
+function initChildMap(lat, lng) {
+    if (!childMap) {
+        // Create map
+        childMap = L.map('childMap').setView([lat, lng], 15);
+        
+        // Add tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(childMap);
+        
+        // Add marker
+        currentMarker = L.marker([lat, lng], {
+            icon: L.icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
+            })
+        }).addTo(childMap);
+        currentMarker.bindPopup('<b>Your Current Location</b>').openPopup();
+        
+        // Load geofences
+        loadGeofences();
+    } else {
+        // Update map view
+        childMap.setView([lat, lng], 15);
+        
+        // Update marker
+        if (currentMarker) {
+            currentMarker.setLatLng([lat, lng]);
+            currentMarker.bindPopup('<b>Your Current Location</b>').openPopup();
+        }
+    }
+    
+    // Update coordinates display
+    document.getElementById('coordinates').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    
+    // Check geofence status
+    checkGeofenceStatus(lat, lng);
+}
+
+// Override the sendLocation function from location.js to also update map
+async function originalSendLocation(latitude, longitude, accuracy) {
+    try {
+        const API_BASE = '/api';
+        const token = localStorage.getItem('token');
+        
+        const response = await fetch(`${API_BASE}/location`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                latitude,
+                longitude,
+                accuracy,
+                platform: 'web',
+                device_token: 'web-browser'
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'ok' && data.alert_triggered) {
+            console.log('Alert triggered!');
+            alert('🚨 Alert: You are outside the safe zone!');
+        }
+    } catch (error) {
+        console.error('Error sending location:', error);
+    }
+}
+
+window.sendLocation = async function(latitude, longitude, accuracy) {
+    // Update map
+    initChildMap(latitude, longitude);
+    
+    // Call original function
+    await originalSendLocation(latitude, longitude, accuracy);
+};
+
+// Try to get initial location for map
+if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition((position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        initChildMap(lat, lng);
+    });
+}
+</script>
+{% endblock %}
+

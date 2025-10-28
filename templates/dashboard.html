@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Geofence Tracking{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+{% endblock %}
+
+{% block content %}
+<nav class="nav-container">
+    <div class="nav-header">
+        <div>
+            <div class="nav-title">Kidaptive</div>
+            <div style="font-size:13px !important;">adaptive tracking for kids</div>
+         </div>
+        <button class="burger-menu" onclick="toggleNavMenu()">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+    </div>
+    <ul class="nav-menu" id="navMenu">
+        <li><a href="/dashboard/">Dashboard</a></li>
+        <li><a href="/dashboard/geofence">Geofences</a></li>
+        <li><a href="/dashboard/alerts">Alerts</a></li>
+        <li><a href="#" onclick="logout()">Logout</a></li>
+    </ul>
+</nav>
+
+<div class="container">
+    <!-- <div class="header">
+        <h3>Dashboard</h3>
+        <p id="welcomeMessage">Welcome, <span id="userName"></span></p>
+    </div> -->
+
+    <!-- Stats Cards -->
+    <div class="dashboard-grid" id="statsGrid">
+        <div class="neu-card">
+            <h3>Devices</h3>
+            <p class="big-number" id="deviceCount">0</p>
+            <div class="device-status">
+                <span class="status-indicator" id="deviceStatus"></span>
+                <span style="font-size: 0.8em;" id="deviceStatusText">No devices</span>
+            </div>
+        </div>
+        
+        <div class="neu-card">
+            <h3>Alerts</h3>
+            <p class="big-number" id="alertCount">0</p>
+            <p style="color: var(--text-color); font-size: 0.85em;">Activity</p>
+        </div>
+        
+        <div class="neu-card">
+            <h3>Geofences</h3>
+            <p class="big-number" id="geofenceCount">0</p>
+            <p style="color: var(--text-color); font-size: 0.85em;">Safe zones</p>
+        </div>
+    </div>
+
+    <!-- Recent Alerts -->
+    <div class="neu-container">
+        <h4>Recent Alerts</h4>
+        <div id="recentAlerts">
+            <p style="text-align: center; padding: 40px;">Loading alerts...</p>
+        </div>
+    </div>
+
+    <!-- Map Container -->
+    <div class="neu-container">
+        <h3>Live Location</h3>
+        <div class="map-container">
+            <div id="dashboardMap"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Notification Container -->
+<div id="notificationContainer"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}
+

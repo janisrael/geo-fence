@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}Geofence Configuration{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    #geofenceMap {
+        z-index: 1;
+    }
+    .leaflet-container {
+        border-radius: 12px;
+        box-shadow: 7px 7px 14px var(--shadow-dark),
+                    -7px -7px 14px var(--shadow-light);
+    }
+</style>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+{% endblock %}
+
+{% block content %}
+<nav class="nav-container">
+    <div class="nav-header">
+        <div>
+            <div class="nav-title">Kidaptive</div>
+            <div style="font-size:14px !important;">adaptive tracking for kids</div>
+         </div>
+        <button class="burger-menu" onclick="toggleNavMenu()">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+    </div>
+    <ul class="nav-menu" id="navMenu">
+        <li><a href="/dashboard/">Dashboard</a></li>
+        <li><a href="/dashboard/geofence" style="font-weight: 700;">Geofences</a></li>
+        <li><a href="/dashboard/alerts">Alerts</a></li>
+        <li><a href="#" onclick="logout()">Logout</a></li>
+    </ul>
+</nav>
+
+<div class="container">
+    <div class="header">
+        <h1>Geofence Configuration</h1>
+        <button class="neu-button neu-button-primary" onclick="showAddGeofence()">
+            <span class="material-icons-round" style="vertical-align: middle; margin-right: 8px;">add</span>
+            Add Geofence
+        </button>
+    </div>
+
+    <div id="geofencesList" class="dashboard-grid">
+        <!-- Geofences will be loaded here -->
+    </div>
+</div>
+
+<!-- Add Geofence Modal -->
+<div id="addGeofenceModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 900px; width: 95%; padding: 30px;">
+        <h2 style="margin-bottom: 20px;">Create Geofence</h2>
+        <form id="geofenceForm">
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label for="gfName">Name</label>
+                <input type="text" id="gfName" name="name" class="neu-input" placeholder="e.g., Home, School" required>
+            </div>
+            
+            <!-- Map Picker -->
+            <div class="form-group">
+                <label>Pick Location on Map (Click to set center)</label>
+                <div id="geofenceMap" style="height: 350px; width: 100%; border-radius: 12px; margin: 10px 0;">
+                    <!-- Leaflet map will be rendered here -->
+                </div>
+                <p style="text-align: center; margin-top: 8px; color: var(--primary-color); font-size: 0.85em;">
+                    Click on the map to set the center, then adjust radius below
+                </p>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="gfLatitude">Latitude</label>
+                    <input type="number" id="gfLatitude" name="latitude" class="neu-input" 
+                           step="0.000001" readonly placeholder="Click map to set">
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="gfLongitude">Longitude</label>
+                    <input type="number" id="gfLongitude" name="longitude" class="neu-input" 
+                           step="0.000001" readonly placeholder="Click map to set">
+                </div>
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label for="gfRadius">Radius: <span id="radiusDisplay">100</span> meters</label>
+                <input type="range" id="gfRadius" name="radius" class="neu-input" 
+                       min="50" max="5000" value="100" step="50" 
+                       oninput="updateRadiusDisplay(this.value)">
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label for="gfLabel">Label</label>
+                <select id="gfLabel" name="label" class="neu-input">
+                    <option value="home">Home</option>
+                    <option value="school">School</option>
+                    <option value="custom">Custom</option>
+                </select>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button type="button" class="neu-button" onclick="closeAddGeofence()" style="flex: 1;">
+                    Cancel
+                </button>
+                <button type="submit" class="neu-button neu-button-primary" style="flex: 1;">
+                    Create Geofence
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/geofence.js') }}"></script>
+{% endblock %}
+
