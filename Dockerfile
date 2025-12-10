@@ -10,8 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy requirements and install
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && \
-    pip list | grep gunicorn && \
-    which gunicorn || echo "Gunicorn not found in PATH"
+    pip show gunicorn || (echo "ERROR: gunicorn not installed!" && exit 1) && \
+    which gunicorn || (echo "ERROR: gunicorn not in PATH!" && exit 1)
 
 # Copy application files
 COPY app/ ./app/

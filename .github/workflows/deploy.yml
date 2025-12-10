@@ -112,10 +112,16 @@ jobs:
             docker system prune -f || true
             
             echo "Applying Kubernetes manifests..."
-            if [ ! -d "/tmp/gabay-k8s" ]; then
+            echo "Checking if k8s directory exists..."
+            if [ -d "k8s" ] && [ "$(ls -A k8s/*.yaml 2>/dev/null)" ]; then
+              echo "Found k8s manifests, copying..."
               mkdir -p /tmp/gabay-k8s
+              cp -r k8s/*.yaml /tmp/gabay-k8s/
+              ls -la /tmp/gabay-k8s/
+            else
+              echo "WARNING: k8s directory or manifests not found!"
+              ls -la k8s/ 2>&1 || echo "k8s directory does not exist"
             fi
-            cp -r k8s/* /tmp/gabay-k8s/ 2>/dev/null || true
             
             # Apply manifests if they exist
             if [ -d "/tmp/gabay-k8s" ] && [ "$(ls -A /tmp/gabay-k8s/*.yaml 2>/dev/null)" ]; then
