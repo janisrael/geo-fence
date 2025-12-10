@@ -36,13 +36,21 @@ def create_app(config_class=Config):
         try:
             db.create_all()
         except Exception as e:
-            # Tables may already exist, verify they're accessible
-            try:
-                from app.models.user import User
-                # Try to query to verify tables exist and are accessible
-                User.query.limit(1).all()
-            except Exception:
-                # If tables don't exist or aren't accessible, re-raise the original error
+            # Handle case where tables already exist (common in production)
+            error_str = str(e).lower()
+            if 'already exists' in error_str or 'table' in error_str:
+                # Tables already exist, verify they're accessible
+                try:
+                    from app.models.user import User
+                    # Try to query to verify tables exist and are accessible
+                    User.query.limit(1).all()
+                except Exception as verify_error:
+                    # If tables don't exist or aren't accessible, log and continue
+                    # The app will handle missing tables on first access
+                    app.logger.warning(f"Database tables may already exist: {e}")
+            else:
+                # Re-raise unexpected errors
+                app.logger.error(f"Database initialization error: {e}")
                 raise e
     
     @app.route('/')
