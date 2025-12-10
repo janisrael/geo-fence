@@ -28,5 +28,5 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:6003/')"
 
 # Run with gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:6003", "--workers", "2", "--threads", "2", "--timeout", "120", "run:app"]
+CMD ["python", "-m", "gunicorn", "--bind", "0.0.0.0:6003", "--workers", "2", "--threads", "2", "--timeout", "120", "run:app"]
 
