@@ -1,6 +1,8 @@
 # Gabay - Location Safety & Geofence Tracking System
 
-A professional geofence tracking and location safety system built with Flask backend and modern web frontend. Designed for real-time location monitoring, geofence alerts, and device tracking with SMS notifications via Twilio.
+A geofence tracking and location safety system built with Flask backend and modern web frontend. Designed for real-time location monitoring, geofence alerts, and device tracking with SMS notifications via Twilio.
+
+**Status**: In Development (Ongoing)
 
 ## Features
 
