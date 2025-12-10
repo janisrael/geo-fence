@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gabay-app
+  namespace: gabay
+  labels:
+    app: gabay
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gabay
+  template:
+    metadata:
+      labels:
+        app: gabay
+    spec:
+      containers:
+      - name: gabay
+        image: gabay:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 6003
+          name: http
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 6003
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 6003
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+
